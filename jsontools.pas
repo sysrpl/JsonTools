@@ -524,7 +524,11 @@ begin
       tkTrue: Node.Add(nkBool, '', 'true');
       tkString: Node.Add(nkString, '', T.Value);
       tkNumber: Node.Add(nkNumber, '', T.Value);
-      tkArrayClose: Exit;
+      tkArrayClose:
+        begin
+          Dec(FStack);
+          Exit;
+        end
     else
       Error;
     end;
