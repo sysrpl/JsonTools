@@ -830,7 +830,10 @@ begin
     else if Kind in [nkBool, nkString, nkNumber] then
       Result.FValue := Value
     else
+    begin
+      Result.FValue := '';
       Result.Clear;
+    end;
     Result.FParent := Self;
     Result.FKind := Kind;
   end
