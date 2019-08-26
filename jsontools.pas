@@ -687,7 +687,7 @@ end;
 
 function TJsonNode.GetAsArray: TJsonNode;
 begin
-  if FKind <> nkObject then
+  if FKind <> nkArray then
   begin
     Clear;
     FKind := nkArray;
