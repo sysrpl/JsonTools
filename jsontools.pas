@@ -475,7 +475,11 @@ begin
   begin
     case T.Kind of
       tkString: N := JsonStringDecode(T.Value);
-      tkObjectClose: Exit;
+      tkObjectClose:
+        begin
+          Dec(FStack);
+          Exit;
+        end
     else
       Error;
     end;
