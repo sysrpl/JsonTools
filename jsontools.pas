@@ -80,8 +80,14 @@ type
     procedure ParseObject(Node: TJsonNode; var C: PChar);
     procedure ParseArray(Node: TJsonNode; var C: PChar);
     procedure Error(const Msg: string = '');
+    function Format(Indent: string): string;
     function Add(Kind: TJsonNodeKind; const Name, Value: string): TJsonNode; overload;
+    function GetRoot: TJsonNode;
+    procedure SetKind(Value: TJsonNodeKind);
     function GetName: string;
+    procedure SetName(const Value: string);
+    function GetValue: string;
+    procedure SetValue(const Value: string);
     function GetAsArray: TJsonNode;
     function GetAsObject: TJsonNode;
     function GetAsNull: TJsonNode;
@@ -110,6 +116,16 @@ type
     procedure Parse(const Json: string);
     { The same as Parse, but returns true if no exception is caught }
     function TryParse(const Json: string): Boolean;
+    { Root node is read only. A node the root when it has no parent. }
+    property Root: TJsonNode read GetRoot;
+    { Parent node is read only }
+    property Parent: TJsonNode read FParent;
+    { Node kind can be changed using the As methods }
+    property Kind: TJsonNodeKind read FKind write SetKind;
+    { Name is unique within the scope }
+    property Name: string read GetName write SetName;
+    { Value of the node in json e.g. '[]', '"hello\nworld!"', 'true', or '1.23e2' }
+    property Value: string read GetValue write SetValue;
     { Add a child node by node kind. If the current node is an array then the
       name parameter will be discarded. If the current node is not an array or
       object the Add methods will convert the node to an object and discard
@@ -117,7 +133,7 @@ type
 
       Note: If the current node is an object then adding an existing name will
       overwrite the matching child node instead of adding. }
-    function Add(Name: string; K: TJsonNodeKind): TJsonNode; overload;
+    function Add(Name: string; K: TJsonNodeKind = nkObject): TJsonNode; overload;
     function Add(Name: string; B: Boolean): TJsonNode; overload;
     function Add(Name: string; const N: Double): TJsonNode; overload;
     function Add(Name: string; const S: string): TJsonNode; overload;
@@ -130,14 +146,6 @@ type
     function Find(const Path: string): TJsonNode;
     { Format the node and all its children as json }
     function ToString: string; override;
-    { Parent node is read only. A node is a root node when its parent is nil. }
-    property Parent: TJsonNode read FParent;
-    { Node kind can be changed using the As methods }
-    property Kind: TJsonNodeKind read FKind;
-    { Name is unique within the scope of its parent and is read only }
-    property Name: string read GetName;
-    { Value of the node in json form e.g. "hello\nworld!", true, or 1.23e2 }
-    property Value: string read FValue;
     { Convert the node to an array }
     property AsArray: TJsonNode read GetAsArray;
     { Convert the node to an object }
@@ -158,8 +166,6 @@ type
     { The number of child nodes. If node is not an object or array this
       property will return 0. }
     property NodeCount: Integer read GetNodeGount;
-    { Text is a convenience property mapping to ToString and Parse }
-    property Text: string read ToString write Parse;
   end;
 
 { JsonValidate tests if a string contains a valid json format }
@@ -321,16 +327,36 @@ begin
       if C^ = '.' then
       begin
         Inc(C);
-        while C^ in ['0'..'9'] do
-          Inc(C);
+        if C^ in ['0'..'9'] then
+        begin
+          while C^ in ['0'..'9'] do
+            Inc(C);
+        end
+        else
+        begin
+          T.Tail := C;
+          T.Kind := tkError;
+          Exit(False);
+        end;
       end;
       if C^ in ['E', 'e'] then
       begin
         Inc(C);
-        if C^ = '-' then
+        if C^ = '+' then
+          Inc(C)
+        else if C^ = '-' then
           Inc(C);
-        while C^ in ['0'..'9'] do
-          Inc(C);
+        if C^ in ['0'..'9'] then
+        begin
+          while C^ in ['0'..'9'] do
+            Inc(C);
+        end
+        else
+        begin
+          T.Tail := C;
+          T.Kind := tkError;
+          Exit(False);
+        end;
       end;
       T.Tail := C;
       T.Kind := tkNumber;
@@ -441,7 +467,7 @@ begin
   while NextToken(C, T) do
   begin
     case T.Kind of
-      tkString: N := T.Value;
+      tkString: N := JsonStringDecode(T.Value);
       tkObjectClose: Exit;
     else
       Error;
@@ -601,6 +627,26 @@ begin
     raise EJsonException.Create(Msg);
 end;
 
+function TJsonNode.GetRoot: TJsonNode;
+begin
+  Result := Self;
+  while Result.FParent <> nil do
+    Result := Result.FParent;
+end;
+
+procedure TJsonNode.SetKind(Value: TJsonNodeKind);
+begin
+  if Value = FKind then Exit;
+  case Value of
+    nkObject: AsObject;
+    nkArray: AsArray;
+    nkBool: AsBoolean;
+    nkNull: AsNull;
+    nkNumber: AsNumber;
+    nkString: AsString;
+  end;
+end;
+
 function TJsonNode.GetName: string;
 begin
   if FParent = nil then
@@ -609,6 +655,34 @@ begin
     Result := IntToStr(FParent.FList.IndexOf(Self))
   else
     Result := FName;
+end;
+
+procedure TJsonNode.SetName(const Value: string);
+var
+  N: TJsonNode;
+begin
+  if FParent = nil then
+    Exit;
+  if FParent.FKind = nkArray then
+    Exit;
+  N := FParent.NodeByName[Value];
+  if N = Self then
+    Exit;
+  FParent.FList.Remove(N);
+  FName := Value;
+end;
+
+function TJsonNode.GetValue: string;
+begin
+  if FKind in [nkObject, nkArray] then
+    Result := ToString
+  else
+    Result := FValue;
+end;
+
+procedure TJsonNode.SetValue(const Value: string);
+begin
+  Parse(Value);
 end;
 
 function TJsonNode.GetAsArray: TJsonNode;
@@ -693,7 +767,7 @@ procedure TJsonNode.SetAsString(Value: string);
 begin
   if FParent = nil then
     Error(SRootNodeKind);
-  if FKind <> nkBool then
+  if FKind <> nkString then
   begin
     Clear;
     FKind := nkString;
@@ -764,7 +838,7 @@ begin
     Error(SNodeNotCollection);
 end;
 
-function TJsonNode.Add(Name: string; K: TJsonNodeKind): TJsonNode; overload;
+function TJsonNode.Add(Name: string; K: TJsonNodeKind = nkObject): TJsonNode; overload;
 begin
   case K of
     nkObject, nkArray: Result := Add(K, Name, '');
@@ -888,21 +962,21 @@ begin
   Result := N;
 end;
 
-function TJsonNode.ToString: string;
-var
-  Indent: string;
+function TJsonNode.Format(Indent: string): string;
 
   function EnumNodes: string;
   var
     I, J: Integer;
+    S: string;
   begin
     if (FList = nil) or (FList.Count = 0) then
       Exit(' ');
     Result := #10;
     J := FList.Count - 1;
+    S := Indent + '    ';
     for I := 0 to J do
     begin
-      Result := Result + TObject(FList[I]).ToString;
+      Result := Result + TJsonNode(FList[I]).Format(S);
       if I < J then
         Result := Result + ','#10
       else
@@ -911,19 +985,11 @@ var
   end;
 
 var
-  Node: TJsonNode;
   Prefix: string;
 begin
   Result := '';
-  Indent := '';
-  Node := FParent;
-  while Node <> nil do
-  begin
-    Node := Node.FParent;
-    Indent := Indent + '    ';
-  end;
   if (FParent <> nil) and (FParent.FKind = nkObject) then
-    Prefix := FName + ': '
+    Prefix := JsonStringEncode(FName) + ': '
   else
     Prefix := '';
   case FKind of
@@ -932,6 +998,11 @@ begin
   else
     Result := Indent + Prefix + FValue;
   end;
+end;
+
+function TJsonNode.ToString: string;
+begin
+  Result := Format('');
 end;
 
 function TJsonNode.GetNode(Index: Integer): TJsonNode;
@@ -1015,8 +1086,6 @@ var
   I, J, K: Integer;
   R: string;
 begin
-  if JsonStringValidate(S) then
-    Exit(S);
   if S = '' then
     Exit('""');
   I := Length(S);
@@ -1091,8 +1160,6 @@ var
   C: Char;
   I, J, K: Integer;
 begin
-  if not JsonStringValidate(S) then
-    Exit(S);
   I := Length(S);
   if I < 3 then
     Exit('');
