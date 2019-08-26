@@ -72,6 +72,7 @@ type
 
   TJsonNode = class
   private
+    FStack: Integer;
     FParent: TJsonNode;
     FName: string;
     FKind: TJsonNodeKind;
@@ -459,11 +460,17 @@ begin
   end;
 end;
 
+const
+  MaxStack = 1000;
+
 procedure TJsonNode.ParseObject(Node: TJsonNode; var C: PChar);
 var
   T: TJsonToken;
   N: string;
 begin
+  Inc(FStack);
+  if FStack > MaxStack then
+    Error;
   while NextToken(C, T) do
   begin
     case T.Kind of
@@ -491,7 +498,10 @@ begin
     if T.Kind = tkComma then
       Continue;
     if T.Kind = tkObjectClose then
+    begin
+      Dec(FStack);
       Exit;
+    end;
     Error;
   end;
   Error;
@@ -501,6 +511,9 @@ procedure TJsonNode.ParseArray(Node: TJsonNode; var C: PChar);
 var
   T: TJsonToken;
 begin
+  Inc(FStack);
+  if FStack > MaxStack then
+    Error;
   while NextToken(C, T) do
   begin
     case T.Kind of
@@ -519,7 +532,10 @@ begin
     if T.Kind = tkComma then
       Continue;
     if T.Kind = tkArrayClose then
+    begin
+      Dec(FStack);
       Exit;
+    end;
     Error;
   end;
   Error;
@@ -621,6 +637,7 @@ end;
 
 procedure TJsonNode.Error(const Msg: string = '');
 begin
+  FStack := 0;
   if Msg = '' then
     raise EJsonException.Create(SParsingError)
   else
