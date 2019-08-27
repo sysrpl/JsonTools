@@ -64,11 +64,14 @@ type
   to convert a root to anything other than array or object will raise an
   exception.
 
-  Note: Strings support unicode by leaving wide characters escaped as values
-  such as \u20AC. If your json string has an escaped unicode character it will
-  remain escaped when converted to a pascal string. If you desire a true unicode
-  character, then just embed it into you json or pascal string values directly
-  without escaping. }
+  Note: The parser supports unicode by converting unicode characters escaped as
+  values such as \u20AC. If your json string has an escaped unicode character it
+  will be unescaped when converted to a pascal string.
+
+  See also:
+
+  JsonStringDecode to convert a JSON string to a normal string
+  JsonStringEncode to convert a normal string to a JSON string }
 
   TJsonNode = class
   private
@@ -1108,134 +1111,207 @@ begin
   Result := NextToken(C, T) and (T.Kind = tkString) and (T.Value = S);
 end;
 
+{ Convert a pascal string to a json string }
+
 function JsonStringEncode(const S: string): string;
+
+  function Len(C: PChar): Integer;
+  var
+    I: Integer;
+  begin
+    I := 0;
+    while C^ > #0 do
+    begin
+      if C^ < ' ' then
+        if C^ in [#8..#13] then
+          Inc(I, 2)
+        else
+          Inc(I, 6)
+      else if C^ in ['"', '\'] then
+        Inc(I, 2)
+      else
+        Inc(I);
+      Inc(C);
+    end;
+    Result := I + 2;
+  end;
+
+const
+  Escape: PChar = '01234567btnvfr';
+  Hex: PChar = '0123456789ABCDEF';
 var
-  C: Char;
-  I, J, K: Integer;
+  C: PChar;
   R: string;
+  I: Integer;
 begin
   if S = '' then
     Exit('""');
-  I := Length(S);
+  C := PChar(S);
   R := '';
-  SetLength(R, I + 2);
-  J := 1;
-  K := 0;
-  while K < I do
-  begin
-    Inc(J);
-    Inc(K);
-    C := S[K];
-    if C = #8 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := 'b';
-    end
-    else if C = #9 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := '7';
-    end
-    else if C = #10 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := 'n';
-    end
-    else if C = #11 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := 'v';
-    end
-    else if C = #12 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := 'f';
-    end
-    else if C = #13 then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := 'r';
-    end
-    else if C = '"' then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := '"';
-    end
-    else if C = '\' then
-    begin
-      R[J] := '\';
-      Inc(J);
-      R[J] := '\';
-    end
-    else if C >= ' ' then
-      R[J] := C;
-  end;
-  SetLength(R, J + 1);
+  SetLength(R, Len(C));
   R[1] := '"';
+  I := 2;
+  while C^ > #0 do
+  begin
+    if C^ < ' ' then
+    begin
+      R[I] := '\';
+      Inc(I);
+      if C^ in [#8..#13] then
+        R[I] := Escape[Ord(C^)]
+      else
+      begin
+        R[I] := 'u';
+        R[I + 1] := '0';
+        R[I + 2] := '0';
+        R[I + 3] := Hex[Ord(C^) div $10];
+        R[I + 4] := Hex[Ord(C^) mod $10];
+        Inc(I, 4);
+      end;
+    end
+    else if C^ in ['"', '\'] then
+    begin
+      R[I] := '\';
+      Inc(I);
+      R[I] := C^;
+    end
+    else
+      R[I] := C^;
+    Inc(I);
+    Inc(C);
+  end;
   R[Length(R)] := '"';
   Result := R;
 end;
 
-function JsonStringDecode(const S: string): string;
-var
-  C: Char;
-  I, J, K: Integer;
+{ Convert a json string to a pascal string }
+
+function UnicodeToString(C: LongWord): string;
 begin
-  I := Length(S);
-  if I < 3 then
-    Exit('');
-  if (S[1] <> '"') or (S[I] <> '"') then
-    Exit('');
-  SetLength(Result, I - 2);
-  J := 0;
-  K := 1;
-  while K < I do
+  if C = 0 then
+    Result := ''
+  else if C < $80 then
+    Result := Chr(C)
+  else if C < $800 then
+    Result := Chr((C shr $6) + $C0) + Chr((C and $3F) + $80)
+  else if C < $10000 then
+    Result := Chr((C shr $C) + $E0) + Chr(((C shr $6) and
+      $3F) + $80) + Chr((C and $3F) + $80)
+  else if C < $200000 then
+    Result := Chr((C shr $12) + $F0) + Chr(((C shr $C) and
+      $3F) + $80) + Chr(((C shr $6) and $3F) + $80) +
+      Chr((C and $3F) + $80)
+  else
+    Result := '';
+end;
+
+function UnicodeToSize(C: LongWord): Integer;
+begin
+  if C = 0 then
+    Result := 0
+  else if C < $80 then
+    Result := 1
+  else if C < $800 then
+    Result := 2
+  else if C < $10000 then
+    Result := 3
+  else if C < $200000 then
+    Result := 4
+  else
+    Result := 0;
+end;
+
+function JsonStringDecode(const S: string): string;
+
+  function Len(C: PChar): Integer;
+  const
+    Hex = ['0'..'9', 'A'..'F', 'a'..'f'];
+  var
+    I, J: Integer;
   begin
-    Inc(J);
-    Inc(K);
-    C := S[K];
-    if C = '\' then
+    if C^ <> '"'  then
+      Exit(0);
+    Inc(C);
+    I := 0;
+    while C^ <> '"' do
     begin
-      Inc(K);
-      C := S[K];
-      if C = 'b' then
-        Result[J] := #8
-      else if C = 't' then
-        Result[J] := #9
-      else if C = 'n' then
-        Result[J] := #10
-      else if C = 'v' then
-        Result[J] := #11
-      else if C = 'f' then
-        Result[J] := #12
-      else if C = 'r' then
-        Result[J] := #13
-      else if C = '''' then
-        Result[J] := ''''
-      else if C = '"' then
-        Result[J] := '"'
-      else if C = '\' then
-        Result[J] := '\'
-      else
+      if C^ = #0 then
+        Exit(0);
+      if C^ = '\' then
       begin
-        Result[J] := '\';
-        Inc(J);
-        Result[J] := C;
+        Inc(C);
+        if C^ = 'u' then
+        begin
+          if (C[1] in Hex) and (C[2] in Hex) and (C[3] in Hex) and (C[4] in Hex) then
+          begin
+            J := UnicodeToSize(StrToInt('$' + C[1] + C[2] + C[3] + C[4]));
+            if J = 0 then
+              Exit(0);
+            Inc(I, J - 1);
+            Inc(C, 4);
+          end
+          else
+            Exit(0);
+        end
+        else if C^ = #0 then
+          Exit(0)
       end;
-    end
-    else if C = '"' then
-      Break
-    else
-      Result[J] := C;
+      Inc(C);
+      Inc(I);
+    end;
+    Result := I;
   end;
-  SetLength(Result, J - 1);
+
+const
+  Escape = ['b', 't', 'n', 'v', 'f', 'r'];
+var
+  C: PChar;
+  R: string;
+  I, J: Integer;
+  H: string;
+begin
+  C := PChar(S);
+  I := Len(C);
+  if I < 1 then
+    Exit('');
+  R := '';
+  SetLength(R, I);
+  I := 1;
+  Inc(C);
+  while C^ <> '"' do
+  begin
+    if C^ = '\' then
+    begin
+      Inc(C);
+      if C^ in Escape then
+      case C^ of
+        'b': R[I] := #8;
+        't': R[I] := #9;
+        'n': R[I] := #10;
+        'v': R[I] := #11;
+        'f': R[I] := #12;
+        'r': R[I] := #13;
+      end
+      else if C^ = 'u' then
+      begin
+        H := UnicodeToString(StrToInt('$' + C[1] + C[2] + C[3] + C[4]));
+        for J := 1 to Length(H) - 1 do
+        begin
+          R[I] := H[J];
+          Inc(I);
+        end;
+        R[I] := H[Length(H)];
+        Inc(C, 4);
+      end
+      else
+        R[I] := C^;
+    end
+    else
+      R[I] := C^;
+    Inc(C);
+    Inc(I);
+  end;
+  Result := R;
 end;
 
 end.
