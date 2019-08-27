@@ -98,7 +98,7 @@ type
     function GetAsBoolean: Boolean;
     procedure SetAsBoolean(Value: Boolean);
     function GetAsString: string;
-    procedure SetAsString(Value: string);
+    procedure SetAsString(const Value: string);
     function GetAsNumber: Double;
     procedure SetAsNumber(Value: Double);
     function GetNode(Index: Integer): TJsonNode;
@@ -182,6 +182,8 @@ function JsonStringValidate(const S: string): Boolean;
 function JsonStringEncode(const S: string): string;
 { JsonStringEncode converts a json string to a pascal string }
 function JsonStringDecode(const S: string): string;
+{ JsonStringEncode converts a json string to xml }
+function JsonToXml(const S: string): string;
 
 implementation
 
@@ -791,7 +793,7 @@ begin
   Result := JsonStringDecode(FValue);
 end;
 
-procedure TJsonNode.SetAsString(Value: string);
+procedure TJsonNode.SetAsString(const Value: string);
 begin
   if FParent = nil then
     Error(SRootNodeKind);
@@ -800,7 +802,7 @@ begin
     Clear;
     FKind := nkString;
   end;
-  FValue :=  JsonStringEncode(Value);
+  FValue := JsonStringEncode(Value);
 end;
 
 function TJsonNode.GetAsNumber: Double;
@@ -1312,6 +1314,71 @@ begin
     Inc(I);
   end;
   Result := R;
+end;
+
+function JsonToXml(const S: string): string;
+const
+  Kinds: array[TJsonNodeKind] of string =
+    (' kind="object"', ' kind="array"', ' kind="bool"', ' kind="null"', ' kind="number"', '');
+  Space = '    ';
+
+  function Escape(N: TJsonNode): string;
+  begin
+    Result := N.Value;
+    if N.Kind = nkString then
+    begin
+      Result := JsonStringDecode(Result);
+      Result := StringReplace(Result, '<', '&lt;', [rfReplaceAll]);
+      Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll]);
+    end;
+  end;
+
+  function EnumNodes(P: TJsonNode; const Indent: string): string;
+  var
+    N: TJsonNode;
+    S: string;
+  begin
+    Result := '';
+    if P.Kind = nkArray then
+      S := 'item'
+    else
+      S := '';
+    for N in P do
+    begin
+      Result := Result + Indent + '<' + S + N.Name + Kinds[N.Kind];
+      case N.Kind of
+        nkObject, nkArray:
+          if N.NodeCount > 0 then
+            Result := Result +  '>'#10 + EnumNodes(N, Indent + Space) +
+              Indent + '</' + S + N.Name + '>'#10
+          else
+            Result := Result + '/>'#10;
+        nkNull: Result := Result + '/>'#10;
+      else
+        Result := Result + '>' + Escape(N) + '</' +  S + N.Name + '>'#10;
+      end;
+    end;
+  end;
+
+var
+  N: TJsonNode;
+begin
+  Result := '';
+  N := TJsonNode.Create;
+  try
+    if N.TryParse(S) then
+    begin
+      Result :=
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'#10 +
+        '<root' +  Kinds[N.Kind];
+        if N.NodeCount > 0 then
+          Result := Result +  '>'#10 + EnumNodes(N, Space) + '</root>'
+        else
+          Result := Result + '/>';
+    end;
+  finally
+    N.Free;
+  end;
 end;
 
 end.
