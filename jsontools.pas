@@ -150,7 +150,9 @@ type
     property Root: TJsonNode read GetRoot;
     { Parent node is read only }
     property Parent: TJsonNode read FParent;
-    { NodeByIndex kind can be changed using the As methods }
+    { Kind can also be changed using the As methods:
+
+      Note: Changes to Kind cause Value to be reset to a default value. }
     property Kind: TJsonNodeKind read FKind write SetKind;
     { Name is unique within the scope }
     property Name: string read GetName write SetName;
@@ -162,8 +164,8 @@ type
     { AsJson is the more efficient version of Value. Text returned from AsJson
       is the most compact representation of the node in json form.
 
-      Note: If you are writing a services to transmit or receive json data, then
-      use AsJson. If you want a friendly human readable text use Value. }
+      Note: If you are writing a services to transmit or receive json data then
+      use AsJson. If you want friendly human readable text use Value. }
     property AsJson: string read GetAsJson write Parse;
     { Convert the node to an array }
     property AsArray: TJsonNode read GetAsArray;
