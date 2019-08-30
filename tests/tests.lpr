@@ -39,8 +39,8 @@ begin
   N := TJsonNode.Create;
   try
     N.Value := '{ "name": "john" }';
-    Result := (N.Kind = nkObject) and (N.NodeCount = 1) and (N[0].Name = 'name')
-      and (N[0].Value = '"john"');
+    Result := (N.Kind = nkObject) and (N.Count = 1) and (N.Child(0).Name = 'name')
+      and (N.Child(0).Value = '"john"');
   except
     Result := False;
   end;
@@ -55,8 +55,8 @@ begin
   N := TJsonNode.Create;
   try
     N.Value := '[ "john", 32, [ { "pi": 314e-2 } ] ]';
-    Result := (N.Kind = nkArray) and (N.NodeCount = 3)and (N[1].Value = '32')
-      and (N[2][0][0].Value = '314e-2');
+    Result := (N.Kind = nkArray) and (N.Count = 3)and (N.Child(1).Value = '32')
+      and (N.Child(2).Child(0).Child(0).Value = '314e-2');
   except
     Result := False;
   end;
@@ -95,11 +95,11 @@ begin
      '   "size": 1'#10+
       '}';
     Result := (N.Find('object_or_array').Value = '"object"')
-      and (N.NodeByName['empty'].Value = 'false')
-      and (N.NodeByName['parse_time_nanoseconds'].AsNumber = 19608)
-      and (N.NodeByName['validate'].AsBoolean)
+      and (N.Child('empty').Value = 'false')
+      and (N.Child('parse_time_nanoseconds').AsNumber = 19608)
+      and (N.Child('validate').AsBoolean)
       and (N.Find('size').AsNumber = 1)
-      and (N.NodeByName['validate'].AsNumber = 0)
+      and (N.Child('validate').AsNumber = 0)
       and (N.Find('size').AsBoolean = False);
   except
     Result := False;
@@ -121,10 +121,44 @@ begin
     N.Add('city', 'Los Angeles');
     N.Add('state', 'CA');
     N.Add('zip', nkNull);
-    Result := (N.Root.NodeCount = 2)
+    Result := (N.Root.Count = 2)
       and (N.Find('/address/city').Value = '"Los Angeles"')
-      and (N.Find('/address').NodeCount = 4)
-      and (N[3].Value = 'null');
+      and (N.Find('/address').Count = 4)
+      and (N.Child(3).Value = 'null');
+  except
+    Result := False;
+  end;
+  N.Root.Free;
+end;
+
+function Test7(out Msg: string): Boolean;
+var
+  N: TJsonNode;
+  S: string;
+begin
+  Msg := 'Test: Dynamic creation';
+  N := TJsonNode.Create;
+  try
+N.Value := '{ "name"   : "Alice Brown",'+
+'  "sku"    : "54321",'+
+'  "valued"  : true,'+
+'  "dates"  : [1, true, "true", [[[]]]],'+
+'  "price"  : 199.95,'+
+'  "shipTo" : { "name" : "Bob Brown",'+
+'               "address" : "456 Oak Lane",'+
+'               "city" : "Pretendville",'+
+'               "state" : "HI",'+
+'               "zip"   : "98999" },'+
+'  "billTo" : { "name" : "Alice Brown",'+
+'               "address" : "456 Oak > Lane",'+
+'               "city" : "Pretendville",'+
+'               "state" : "HI",'+
+'               "zip"   : "98999",'+
+'"notes": null}' +
+'}';
+    S := N.AsJson;
+    N.Parse(S);
+    Result := True;
   except
     Result := False;
   end;
@@ -159,6 +193,7 @@ begin
   Check(Test4, Passed, Failed);
   Check(Test5, Passed, Failed);
   Check(Test6, Passed, Failed);
+  Check(Test7, Passed, Failed);
   if Failed > 0 then
     WriteLn(Failed, ' tests FAILED')
   else

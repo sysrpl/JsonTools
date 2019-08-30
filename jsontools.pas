@@ -150,7 +150,7 @@ type
     property Root: TJsonNode read GetRoot;
     { Parent node is read only }
     property Parent: TJsonNode read FParent;
-    { Kind can also be changed using the As methods:
+    { Kind can also be changed using the As methods.
 
       Note: Changes to Kind cause Value to be reset to a default value. }
     property Kind: TJsonNodeKind read FKind write SetKind;
