@@ -436,41 +436,33 @@ end;
 
 procedure TJsonNode.LoadFromStream(Stream: TStream);
 var
-  S: TStringStream;
+  S: string;
+  I: Int64;
 begin
-  S := TStringStream.Create('');
-  try
-    S.CopyFrom(Stream, 0);
-    Parse(S.DataString);
-  finally
-    S.Free;
-  end;
+  I := Stream.Size - Stream.Position;
+  SetLength(S, I);
+  Stream.Read(PChar(S)^, I);
+  Parse(S);
 end;
 
 procedure TJsonNode.SaveToStream(Stream: TStream);
 var
-  S: TStringStream;
+  S: string;
+  I: Int64;
 begin
-  S := TStringStream.Create(AsString);
-  try
-    Stream.CopyFrom(Stream, 0);
-  finally
-    S.Free;
-  end;
+  S := AsString;
+  I := Length(S);
+  Stream.Write(PChar(S)^, I);
 end;
 
 procedure TJsonNode.LoadFromFile(const FileName: string);
 var
   F: TFileStream;
-  S: TStringStream;
 begin
   F := TFileStream.Create(FileName, fmOpenRead);
-  S := TStringStream.Create('');
   try
-    S.CopyFrom(F, 0);
-    Parse(S.DataString);
+    LoadFromStream(F);
   finally
-    S.Free;
     F.Free;
   end;
 end;
@@ -478,14 +470,11 @@ end;
 procedure TJsonNode.SaveToFile(const FileName: string);
 var
   F: TFileStream;
-  S: TStringStream;
 begin
   F := TFileStream.Create(FileName, fmCreate);
-  S := TStringStream.Create(AsString);
   try
-    F.CopyFrom(S, 0);
+    SaveToStream(F);
   finally
-    S.Free;
     F.Free;
   end;
 end;
