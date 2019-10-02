@@ -4,7 +4,7 @@
 (*  A small json parser with no dependencies            *)
 (*                                                      *)
 (*  http://www.getlazarus.org/json                      *)
-(*  Released under the GPLv3 August 2019                *)
+(*  Dual licence GPLv3 LGPLv3 released August 2019      *)
 (*                                                      *)
 (********************************************************)
 unit JsonTools;
@@ -1242,7 +1242,7 @@ end;
 function UnicodeToString(C: LongWord): string;
 begin
   if C = 0 then
-    Result := ''
+    Result := #0
   else if C < $80 then
     Result := Chr(C)
   else if C < $800 then
@@ -1261,7 +1261,7 @@ end;
 function UnicodeToSize(C: LongWord): Integer;
 begin
   if C = 0 then
-    Result := 0
+    Result := 1
   else if C < $80 then
     Result := 1
   else if C < $800 then
