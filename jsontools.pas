@@ -450,7 +450,7 @@ var
   S: string;
   I: Int64;
 begin
-  S := AsString;
+  S := Value;
   I := Length(S);
   Stream.Write(PChar(S)^, I);
 end;
