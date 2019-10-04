@@ -440,6 +440,7 @@ var
   I: Int64;
 begin
   I := Stream.Size - Stream.Position;
+  S := '';
   SetLength(S, I);
   Stream.Read(PChar(S)^, I);
   Parse(S);
@@ -1239,7 +1240,7 @@ end;
 
 { Convert a json string to a pascal string }
 
-function UnicodeToString(C: LongWord): string;
+function UnicodeToString(C: LongWord): string; inline;
 begin
   if C = 0 then
     Result := #0
@@ -1258,7 +1259,7 @@ begin
     Result := '';
 end;
 
-function UnicodeToSize(C: LongWord): Integer;
+function UnicodeToSize(C: LongWord): Integer; inline;
 begin
   if C = 0 then
     Result := 1
@@ -1272,6 +1273,26 @@ begin
     Result := 4
   else
     Result := 0;
+end;
+
+function HexToByte(C: Char): Byte; inline;
+const
+  Zero = Ord('0');
+  UpA = Ord('A');
+  LoA = Ord('a');
+begin
+  if C < 'A' then
+    Result := Ord(C) - Zero
+  else if C < 'a' then
+    Result := Ord(C) - UpA + 10
+  else
+    Result := Ord(C) - LoA + 10;
+end;
+
+function HexToInt(A, B, C, D: Char): Integer; inline;
+begin
+  Result := HexToByte(A) shl 12 or HexToByte(B) shl 8 or HexToByte(C) shl 4 or
+    HexToByte(D);
 end;
 
 function JsonStringDecode(const S: string): string;
@@ -1295,7 +1316,7 @@ function JsonStringDecode(const S: string): string;
         begin
           if (C[1] in Hex) and (C[2] in Hex) and (C[3] in Hex) and (C[4] in Hex) then
           begin
-            J := UnicodeToSize(StrToInt('$' + C[1] + C[2] + C[3] + C[4]));
+            J := UnicodeToSize(HexToInt(C[1], C[2], C[3], C[4]));
             if J = 0 then
               Exit(0);
             Inc(I, J - 1);
@@ -1345,7 +1366,7 @@ begin
       end
       else if C^ = 'u' then
       begin
-        H := UnicodeToString(StrToInt('$' + C[1] + C[2] + C[3] + C[4]));
+        H := UnicodeToString(HexToInt(C[1], C[2], C[3], C[4]));
         for J := 1 to Length(H) - 1 do
         begin
           R[I] := H[J];
