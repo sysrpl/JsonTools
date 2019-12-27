@@ -48,9 +48,9 @@ type
     FNode: TJsonNode;
     FIndex: Integer;
   public
-    procedure Init(Node: TJsonNode);
-    function GetCurrent: TJsonNode;
-    function MoveNext: Boolean;
+    procedure Init(Node: TJsonNode); inline;
+    function GetCurrent: TJsonNode; inline;
+    function MoveNext: Boolean; inline;
     property Current: TJsonNode read GetCurrent;
   end;
 
@@ -80,7 +80,7 @@ type
     FName: string;
     FKind: TJsonNodeKind;
     FValue: string;
-    FList: TList;
+    FList: TFPList;
     procedure ParseObject(Node: TJsonNode; var C: PChar);
     procedure ParseArray(Node: TJsonNode; var C: PChar);
     procedure Error(const Msg: string = '');
@@ -861,7 +861,7 @@ begin
   if FKind in [nkArray, nkObject] then
   begin
     if FList = nil then
-      FList := TList.Create;
+      FList := TFPList.Create;
     if FKind = nkArray then
       S := IntToStr(FList.Count)
     else
