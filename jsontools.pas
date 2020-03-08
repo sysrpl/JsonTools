@@ -189,9 +189,9 @@ function JsonNumberValidate(const N: string): Boolean;
 function JsonStringValidate(const S: string): Boolean;
 { JsonStringEncode converts a pascal string to a json string }
 function JsonStringEncode(const S: string): string;
-{ JsonStringEncode converts a json string to a pascal string }
+{ JsonStringDecode converts a json string to a pascal string }
 function JsonStringDecode(const S: string): string;
-{ JsonStringEncode converts a json string to xml }
+{ JsonToXml converts a json string to xml }
 function JsonToXml(const S: string): string;
 
 implementation
@@ -314,8 +314,8 @@ begin
   end;
   if C^ = '"'  then
   begin
+    Inc(C);
     repeat
-      Inc(C);
       if C^ = '\' then
       begin
         Inc(C);
@@ -328,7 +328,9 @@ begin
             T.Kind := tkError;
             Exit(False);
           end;
-      end;
+      end
+      else if not (C^ in [#0, #10, #13, '"']) then
+        Inc(C);
     until C^ in [#0, #10, #13, '"'];
     if C^ = '"' then
     begin
