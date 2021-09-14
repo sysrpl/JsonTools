@@ -103,6 +103,22 @@ type
     procedure SetAsString(const Value: string);
     function GetAsNumber: Double;
     procedure SetAsNumber(Value: Double);
+    function GetAsSmallInt: SmallInt;
+    procedure SetAsSmallInt(Value: SmallInt);
+    function GetAsInteger: LongInt;
+    procedure SetAsInteger(Value: LongInt);
+    function GetAsInt64: Int64;
+    procedure SetAsInt64(Value: Int64);
+    function GetAsQWord: QWord;
+    procedure SetAsQWord(Value: QWord);
+    function GetAsDWord: DWord;
+    procedure SetAsDWord(Value: DWord);
+    function GetAsWord: Word;
+    procedure SetAsWord(Value: Word);
+    function GetAsNativeInt: NativeInt;
+    procedure SetAsNativeInt(Value: NativeInt);
+    function GetAsNativeUInt: NativeUInt;
+    procedure SetAsNativeUInt(Value: NativeUInt);
   public
     { A parent node owns all children. Only destroy a node if it has no parent.
       To destroy a child node use Delete or Clear methods instead. }
@@ -187,6 +203,16 @@ type
     property AsString: string read GetAsString write SetAsString;
     { Convert the node to a number }
     property AsNumber: Double read GetAsNumber write SetAsNumber;
+    property AsInteger: Integer read GetAsInteger write SetAsInteger;
+    property AsInt16: Int16 read GetAsSmallInt write SetAsSmallInt;
+    property AsInt32: Int32 read GetAsInteger write SetAsInteger;
+    property AsInt64: Int64 read GetAsInt64 write SetAsInt64;
+    property AsQWord: QWord read GetAsQWord write SetAsQWord;
+    property AsUInt16: UInt16 read GetAsWord write SetAsWord;
+    property AsUInt32: UInt32 read GetAsDWord write SetAsDWord;
+    property AsUInt64: UInt64 read GetAsQWord write SetAsQWord;
+    property AsNativeInt: NativeInt read GetAsNativeInt write SetAsNativeInt;
+    property AsNativeUInt: NativeUInt read GetAsNativeUInt write SetAsNativeUInt;
   end;
 
 { JsonValidate tests if a string contains a valid json format }
@@ -859,6 +885,188 @@ begin
     FKind := nkNumber;
   end;
   FValue := FloatToStr(Value);
+end;
+
+function TJsonNode.GetAsInteger: LongInt;
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+    FValue := '0';
+    Exit(0);
+  end;
+  Result := StrToIntDef(FValue, 0);
+end;
+
+procedure TJsonNode.SetAsInteger(Value: LongInt);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsSmallInt: SmallInt;
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+    FValue := '0';
+    Exit(0);
+  end;
+  Result := StrToIntDef(FValue, 0);
+end;
+
+procedure TJsonNode.SetAsSmallInt(Value: SmallInt);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsInt64: Int64;
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+    FValue := '0';
+    Exit(0);
+  end;
+  Result := StrToInt64Def(FValue, 0);
+end;
+
+procedure TJsonNode.SetAsInt64(Value: Int64);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsQWord: QWord;
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+    FValue := '0';
+    Exit(0);
+  end;
+  Result := StrToQWordDef(FValue, 0);
+end;
+
+procedure TJsonNode.SetAsQWord(Value: QWord);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsDWord: DWord;
+begin
+  Exit (GetAsQWord);
+end;
+
+procedure TJsonNode.SetAsDWord(Value: DWord);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsWord: Word;
+begin
+  Exit (GetAsDWord);
+end;
+
+procedure TJsonNode.SetAsWord(Value: Word);
+begin
+  if FParent = nil then
+    Error(SRootNodeKind);
+  if FKind <> nkNumber then
+  begin
+    Clear;
+    FKind := nkNumber;
+  end;
+  FValue := IntToStr(Value);
+end;
+
+function TJsonNode.GetAsNativeInt: NativeInt;
+begin
+  {$ifdef cpu64}
+  Exit (GetAsInt64);
+  {$endif}
+  {$ifdef cpu32}
+  Exit (GetAsInteger);
+  {$endif}
+  {$ifdef cpu16}
+  Exit (GetAsSmallInt);
+  {$endif}
+end;
+
+procedure TJsonNode.SetAsNativeInt(Value: NativeInt);
+begin
+  {$ifdef cpu64}
+  SetAsInt64 (Value);
+  {$endif}
+  {$ifdef cpu32}
+  SetAsInteger (Value);
+  {$endif}
+  {$ifdef cpu16}
+  SetAsSmallInt (Value);
+  {$endif}
+end;
+
+function TJsonNode.GetAsNativeUInt: NativeUInt;
+begin
+  {$ifdef cpu64}
+  Exit (GetAsQWord);
+  {$else}
+  Exit (GetAsDWord);
+  {$endif}
+end;
+
+procedure TJsonNode.SetAsNativeUInt(Value: NativeUInt);
+begin
+  {$ifdef cpu64}
+  SetAsQWord (Value);
+  {$else}
+  SetAsDWord (Value);
+  {$endif}
 end;
 
 function TJsonNode.Add: TJsonNode;
