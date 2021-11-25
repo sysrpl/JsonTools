@@ -129,6 +129,8 @@ type
     function Add(const Name: string; K: TJsonNodeKind = nkObject): TJsonNode; overload;
     function Add(const Name: string; B: Boolean): TJsonNode; overload;
     function Add(const Name: string; const N: Double): TJsonNode; overload;
+    function Add(const Name: string; const N: QWord): TJsonNode; overload;
+    function Add(const Name: string; const N: Int64): TJsonNode; overload;
     function Add(const Name: string; const S: string): TJsonNode; overload;
     { Convert to an array and add an item }
     function Add: TJsonNode; overload;
@@ -927,6 +929,16 @@ end;
 function TJsonNode.Add(const Name: string; const N: Double): TJsonNode; overload;
 begin
   Result := Add(nkNumber, Name, FloatToStr(N));
+end;
+
+function TJsonNode.Add(const Name: string; const N: QWord): TJsonNode;
+begin
+  Result := Add(nkNumber, Name, IntToStr(N));
+end;
+
+function TJsonNode.Add(const Name: string; const N: Int64): TJsonNode;
+begin
+Result := Add(nkNumber, Name, IntToStr(N));
 end;
 
 function TJsonNode.Add(const Name: string; const S: string): TJsonNode; overload;
