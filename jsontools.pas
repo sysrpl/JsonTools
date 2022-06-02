@@ -199,7 +199,7 @@ function JsonStringValidate(const S: string): Boolean;
 function JsonStringEncode(const S: string): string;
 { JsonStringEncode converts a json string to a pascal string }
 function JsonStringDecode(const S: string): string;
-{ JsonStringEncode converts a json string to xml }
+{ JsonToXml converts a json string to xml }
 function JsonToXml(const S: string): string;
 
 implementation
