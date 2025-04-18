@@ -482,7 +482,7 @@ begin
     end;
   end
   else
-    FJson.AsObject;
+    AsObject;
 end;
 
 procedure TJsonNode.SaveToFile(const FileName: string);
