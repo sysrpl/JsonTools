@@ -472,17 +472,16 @@ procedure TJsonNode.LoadFromFile(const FileName: string);
 var
   F: TFileStream;
 begin
-  if SysUtils.FileExists( FileName ) then
-  begin
+  try
     F := TFileStream.Create(FileName, fmOpenRead);
     try
       LoadFromStream(F);
     finally
       F.Free;
     end;
-  end
-  else
+  except
     AsObject;
+  end;  
 end;
 
 procedure TJsonNode.SaveToFile(const FileName: string);
