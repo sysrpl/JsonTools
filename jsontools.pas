@@ -1083,6 +1083,7 @@ var
   N: TJsonNode;
   A, B: PChar;
   S: string;
+  ChildNode: TJsonNode;
 begin
   Result := nil;
   // AsObject;
@@ -1121,10 +1122,11 @@ begin
     if B^ = '/' then
     begin
       SetString(S, A, B - A);
-      if N.Child(S) = nil then
+      ChildNode = N.Child(S);
+      if ChildNode = nil then
         N := N.Add(S)
       else
-        N := N.Child(S);
+        N := ChildNode;
       A := B + 1;
       B := A;
     end
@@ -1134,10 +1136,11 @@ begin
       if B^ = #0 then
       begin
         SetString(S, A, B - A);
-        if N.Child(S) = nil then
+        ChildNode := N.Child(S);
+        if ChildNode = nil then
           N := N.Add(S)
         else
-          N := N.Child(S);
+          N := ChildNode;
       end;
     end;
   end;
