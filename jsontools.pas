@@ -84,8 +84,8 @@ type
     procedure ParseObject(Node: TJsonNode; var C: PChar);
     procedure ParseArray(Node: TJsonNode; var C: PChar);
     procedure Error(const Msg: string = '');
-    function Format(const Indent: string): string;
-    function FormatCompact: string;
+    function Format(const Indent: string; IncludeKey: Boolean = False): string;
+    function FormatCompact(IncludeKey: Boolean = False): string;
     function Add(Kind: TJsonNodeKind; const Name, Value: string): TJsonNode; overload;
     function GetRoot: TJsonNode;
     procedure SetKind(Value: TJsonNodeKind);
@@ -1147,7 +1147,7 @@ begin
   Result := N;
 end;
 
-function TJsonNode.Format(const Indent: string): string;
+function TJsonNode.Format(const Indent: string; IncludeKey: Boolean = False): string;
 
   function EnumNodes: string;
   var
@@ -1161,7 +1161,7 @@ function TJsonNode.Format(const Indent: string): string;
     S := Indent + #9;
     for I := 0 to J do
     begin
-      Result := Result + TJsonNode(FList[I]).Format(S);
+      Result := Result + TJsonNode(FList[I]).Format(S, True);
       if I < J then
         Result := Result + ','#10
       else
@@ -1173,7 +1173,7 @@ var
   Prefix: string;
 begin
   Result := '';
-  if (FParent <> nil) and (FParent.FKind = nkObject) then
+  if IncludeKey and (FParent.FKind = nkObject) then
     Prefix := JsonStringEncode(FName) + ': '
   else
     Prefix := '';
@@ -1185,7 +1185,7 @@ begin
   end;
 end;
 
-function TJsonNode.FormatCompact: string;
+function TJsonNode.FormatCompact(IncludeKey: Boolean = False): string;
 
   function EnumNodes: string;
   var
@@ -1197,7 +1197,7 @@ function TJsonNode.FormatCompact: string;
     J := FList.Count - 1;
     for I := 0 to J do
     begin
-      Result := Result + TJsonNode(FList[I]).FormatCompact;
+      Result := Result + TJsonNode(FList[I]).FormatCompact(True);
       if I < J then
         Result := Result + ',';
     end;
@@ -1207,7 +1207,7 @@ var
   Prefix: string;
 begin
   Result := '';
-  if (FParent <> nil) and (FParent.FKind = nkObject) then
+  if IncludeKey and (FParent.FKind = nkObject) then
     Prefix := JsonStringEncode(FName) + ':'
   else
     Prefix := '';
