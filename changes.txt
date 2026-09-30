@@ -1,0 +1,60 @@
+JsonTools changes - September 30, 2026
+======================================
+
+Based on the June 2022 version of jsontools.pas. The same fixes were also
+applied to Codebot.Text.Json in the Codebot library, which shares this code.
+
+Fixes in jsontools.pas
+----------------------
+
+1. Numbers ignore the system locale
+   Numbers were written with FloatToStr and read with StrToFloatDef using the
+   system locale. In locales with a comma decimal separator, 1.5 was saved as
+   1,5 (invalid json) and "1.5" was read back as 0. Numbers now always use a
+   period through a JsonFormat TFormatSettings set up in the initialization
+   section. Affects Add(Name, Double), AsNumber (read and write).
+
+2. Vertical tab is encoded as \u000B
+   JsonStringEncode wrote character #11 as \v, which is not a valid json
+   escape. It is now written as \u000B. JsonStringDecode still accepts \v.
+
+3. Surrogate pairs decode to a single character
+   JsonStringDecode turned characters outside the basic plane, such as the
+   emoji 😀, into two separate 3 byte sequences, which is invalid
+   utf-8. A new ReadUnicode function combines surrogate pairs into one 4 byte
+   utf-8 character. A lone surrogate becomes the replacement character U+FFFD.
+
+4. A utf-8 byte order mark is skipped
+   Parse failed on text starting with a byte order mark (EF BB BF), such as
+   files saved by some editors. The mark is now skipped.
+
+5. Delete frees the removed child
+   Delete(Index) and Delete(Name) removed the child node from the list but
+   never freed it, leaking memory.
+
+6. Renaming onto an existing name frees the replaced sibling
+   Setting Name to the name of an existing sibling removed that sibling from
+   the list without freeing it, leaking memory.
+
+7. Add over an existing child replaces all of its content
+   In an object, adding a value with the name of an existing child reuses
+   that child. When the new value was a bool, null, number, or string, the
+   child's old sub nodes were kept, leaking memory and leaving stale
+   children. The child is now always cleared first.
+
+8. JsonToXml escapes ampersands
+   String values containing & produced invalid xml. & is now written as
+   &amp; (before < and > are escaped).
+
+Other changes
+-------------
+
+- Corrected the doc comments for JsonStringDecode and JsonToXml, which were
+  labelled as JsonStringEncode.
+
+Tests
+-----
+
+tests/tests.lpr now uses SysUtils and has six new tests, Test8 through Test13,
+covering fixes 1 through 8. All 13 tests pass, and a heaptrc build (-gh)
+reports 0 unfreed memory blocks.

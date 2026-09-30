@@ -197,7 +197,7 @@ function JsonNumberValidate(const N: string): Boolean;
 function JsonStringValidate(const S: string): Boolean;
 { JsonStringEncode converts a pascal string to a json string }
 function JsonStringEncode(const S: string): string;
-{ JsonStringEncode converts a json string to a pascal string }
+{ JsonStringDecode converts a json string to a pascal string }
 function JsonStringDecode(const S: string): string;
 { JsonToXml converts a json string to xml }
 function JsonToXml(const S: string): string;
@@ -223,6 +223,11 @@ type
 
 const
   Hex = ['0'..'9', 'A'..'F', 'a'..'f'];
+
+var
+  { Json numbers always use a period as the decimal separator regardless of
+    the system locale }
+  JsonFormat: TFormatSettings;
 
 function TJsonToken.Value: string;
 begin
@@ -588,6 +593,9 @@ var
 begin
   Clear;
   C := PChar(Json);
+  { Skip a utf-8 byte order mark }
+  if (C[0] = #$EF) and (C[1] = #$BB) and (C[2] = #$BF) then
+    Inc(C, 3);
   if FParent = nil then
   begin
     if NextToken(C, T) and (T.Kind in [tkObjectOpen, tkArrayOpen]) then
@@ -725,7 +733,11 @@ begin
   N := FParent.Child(Value);
   if N = Self then
     Exit;
-  FParent.FList.Remove(N);
+  if N <> nil then
+  begin
+    FParent.FList.Remove(N);
+    N.Free;
+  end;
   FName := Value;
 end;
 
@@ -846,7 +858,7 @@ begin
     FValue := '0';
     Exit(0);
   end;
-  Result := StrToFloatDef(FValue, 0);
+  Result := StrToFloatDef(FValue, 0, JsonFormat);
 end;
 
 procedure TJsonNode.SetAsNumber(Value: Double);
@@ -858,7 +870,7 @@ begin
     Clear;
     FKind := nkNumber;
   end;
-  FValue := FloatToStr(Value);
+  FValue := FloatToStr(Value, JsonFormat);
 end;
 
 function TJsonNode.Add: TJsonNode;
@@ -890,15 +902,13 @@ begin
       Result.FName := S;
       FList.Add(Result);
     end;
+    Result.Clear;
     if Kind = nkNull then
       Result.FValue := 'null'
     else if Kind in [nkBool, nkString, nkNumber] then
       Result.FValue := Value
     else
-    begin
       Result.FValue := '';
-      Result.Clear;
-    end;
     Result.FParent := Self;
     Result.FKind := Kind;
   end
@@ -926,7 +936,7 @@ end;
 
 function TJsonNode.Add(const Name: string; const N: Double): TJsonNode; overload;
 begin
-  Result := Add(nkNumber, Name, FloatToStr(N));
+  Result := Add(nkNumber, Name, FloatToStr(N, JsonFormat));
 end;
 
 function TJsonNode.Add(const Name: string; const S: string): TJsonNode; overload;
@@ -941,8 +951,8 @@ begin
   N := Child(Index);
   if N <> nil then
   begin
-    N.Free;
     FList.Delete(Index);
+    N.Free;
     if FList.Count = 0 then
     begin
       FList.Free;
@@ -958,8 +968,8 @@ begin
   N := Child(Name);
   if N <> nil then
   begin
-    N.Free;
     FList.Remove(N);
+    N.Free;
     if FList.Count = 0 then
     begin
       FList.Free;
@@ -1083,7 +1093,6 @@ var
   N: TJsonNode;
   A, B: PChar;
   S: string;
-  ChildNode: TJsonNode;
 begin
   Result := nil;
   // AsObject;
@@ -1122,11 +1131,10 @@ begin
     if B^ = '/' then
     begin
       SetString(S, A, B - A);
-      ChildNode = N.Child(S);
-      if ChildNode = nil then
+      if N.Child(S) = nil then
         N := N.Add(S)
       else
-        N := ChildNode;
+        N := N.Child(S);
       A := B + 1;
       B := A;
     end
@@ -1136,11 +1144,10 @@ begin
       if B^ = #0 then
       begin
         SetString(S, A, B - A);
-        ChildNode := N.Child(S);
-        if ChildNode = nil then
+        if N.Child(S) = nil then
           N := N.Add(S)
         else
-          N := ChildNode;
+          N := N.Child(S);
       end;
     end;
   end;
@@ -1276,7 +1283,7 @@ function JsonStringEncode(const S: string): string;
     while C^ > #0 do
     begin
       if C^ < ' ' then
-        if C^ in [#8..#13] then
+        if C^ in [#8, #9, #10, #12, #13] then
           Inc(I, 2)
         else
           Inc(I, 6)
@@ -1310,7 +1317,7 @@ begin
     begin
       R[I] := '\';
       Inc(I);
-      if C^ in [#8..#13] then
+      if C^ in [#8, #9, #10, #12, #13] then
         R[I] := EscapeChars[Ord(C^)]
       else
       begin
@@ -1394,6 +1401,35 @@ begin
     HexToByte(D);
 end;
 
+{ Read a \uXXXX escape with C pointing at the 'u'. A surrogate pair such as
+  \uD83D\uDE00 is combined into one code point, and a lone surrogate becomes
+  the replacement character. C is left on the last hex digit read. }
+
+function ReadUnicode(var C: PChar): LongWord;
+var
+  L: LongWord;
+begin
+  Result := HexToInt(C[1], C[2], C[3], C[4]);
+  Inc(C, 4);
+  if (Result >= $D800) and (Result <= $DBFF) then
+  begin
+    if (C[1] = '\') and (C[2] = 'u') and (C[3] in Hex) and (C[4] in Hex) and
+      (C[5] in Hex) and (C[6] in Hex) then
+    begin
+      L := HexToInt(C[3], C[4], C[5], C[6]);
+      if (L >= $DC00) and (L <= $DFFF) then
+      begin
+        Result := $10000 + ((Result - $D800) shl 10) + (L - $DC00);
+        Inc(C, 6);
+        Exit;
+      end;
+    end;
+    Result := $FFFD;
+  end
+  else if (Result >= $DC00) and (Result <= $DFFF) then
+    Result := $FFFD;
+end;
+
 function JsonStringDecode(const S: string): string;
 
   function Len(C: PChar): Integer;
@@ -1415,11 +1451,10 @@ function JsonStringDecode(const S: string): string;
         begin
           if (C[1] in Hex) and (C[2] in Hex) and (C[3] in Hex) and (C[4] in Hex) then
           begin
-            J := UnicodeToSize(HexToInt(C[1], C[2], C[3], C[4]));
+            J := UnicodeToSize(ReadUnicode(C));
             if J = 0 then
               Exit(0);
             Inc(I, J - 1);
-            Inc(C, 4);
           end
           else
             Exit(0);
@@ -1465,14 +1500,13 @@ begin
       end
       else if C^ = 'u' then
       begin
-        H := UnicodeToString(HexToInt(C[1], C[2], C[3], C[4]));
+        H := UnicodeToString(ReadUnicode(C));
         for J := 1 to Length(H) - 1 do
         begin
           R[I] := H[J];
           Inc(I);
         end;
         R[I] := H[Length(H)];
-        Inc(C, 4);
       end
       else
         R[I] := C^;
@@ -1497,6 +1531,7 @@ const
     if N.Kind = nkString then
     begin
       Result := JsonStringDecode(Result);
+      Result := StringReplace(Result, '&', '&amp;', [rfReplaceAll]);
       Result := StringReplace(Result, '<', '&lt;', [rfReplaceAll]);
       Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll]);
     end;
@@ -1550,4 +1585,8 @@ begin
   end;
 end;
 
+initialization
+  JsonFormat := DefaultFormatSettings;
+  JsonFormat.DecimalSeparator := '.';
+  JsonFormat.ThousandSeparator := #0;
 end.

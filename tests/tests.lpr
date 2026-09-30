@@ -11,6 +11,7 @@ program Tests;
 {$mode delphi}
 
 uses
+  SysUtils,
   JsonTools in '../jsontools.pas';
 
 type
@@ -165,6 +166,86 @@ N.Value := '{ "name"   : "Alice Brown",'+
   N.Root.Free;
 end;
 
+function Test8(out Msg: string): Boolean;
+var
+  N: TJsonNode;
+  Saved: Char;
+begin
+  Msg := 'Test: Numbers ignore the locale decimal separator';
+  Saved := DefaultFormatSettings.DecimalSeparator;
+  DefaultFormatSettings.DecimalSeparator := ',';
+  N := TJsonNode.Create;
+  try
+    N.Add('a', 1.5);
+    N.Parse(N.AsJson);
+    Result := (N.AsJson = '{"a":1.5}') and (N.Child('a').AsNumber = 1.5);
+  except
+    Result := False;
+  end;
+  N.Free;
+  DefaultFormatSettings.DecimalSeparator := Saved;
+end;
+
+function Test9(out Msg: string): Boolean;
+begin
+  Msg := 'Test: Vertical tab encodes as \u000B';
+  Result := (JsonStringEncode('a'#11'b') = '"a\u000Bb"') and
+    (JsonStringDecode('"a\u000Bb"') = 'a'#11'b') and
+    JsonStringValidate(JsonStringEncode(#1#8#9#10#11#12#13));
+end;
+
+function Test10(out Msg: string): Boolean;
+begin
+  Msg := 'Test: Surrogate pairs decode to one utf-8 character';
+  Result := (JsonStringDecode('"😀"') = #$F0#$9F#$98#$80) and
+    (JsonStringDecode('"x\uD83Dy"') = 'x'#$EF#$BF#$BD'y') and
+    (JsonStringDecode('"€"') = #$E2#$82#$AC);
+end;
+
+function Test11(out Msg: string): Boolean;
+var
+  N: TJsonNode;
+begin
+  Msg := 'Test: Parse text starting with a byte order mark';
+  N := TJsonNode.Create;
+  try
+    N.Parse(#$EF#$BB#$BF'{ "a": 1 }');
+    Result := N.Child('a').AsNumber = 1;
+  except
+    Result := False;
+  end;
+  N.Free;
+end;
+
+function Test12(out Msg: string): Boolean;
+var
+  N: TJsonNode;
+begin
+  Msg := 'Test: Delete, rename, and overwrite replace children';
+  N := TJsonNode.Create;
+  try
+    N.Parse('{ "a": 1, "b": { "c": [1, 2] }, "d": 3, "e": 4 }');
+    N.Delete('a');
+    N.Delete(0);
+    N.Child('d').Name := 'e';
+    N.Add('e', 'text');
+    Result := (N.Count = 1) and (N.Child('e').AsString = 'text') and
+      (N.Child('e').Count = 0);
+    N.Add('e', nkObject).Add('f', 1);
+    N.Add('e', 'again');
+    Result := Result and (N.Child('e').Count = 0) and (N.AsJson = '{"e":"again"}');
+  except
+    Result := False;
+  end;
+  N.Free;
+end;
+
+function Test13(out Msg: string): Boolean;
+begin
+  Msg := 'Test: JsonToXml escapes ampersands';
+  Result := Pos('<a>x &amp; y &lt;z&gt;</a>', JsonToXml('{ "a": "x & y <z>" }')) > 0;
+end;
+
 procedure Check(Test: TTest; var Passed, Failed: Integer);
 var
   S: string;
@@ -194,6 +275,12 @@ begin
   Check(Test5, Passed, Failed);
   Check(Test6, Passed, Failed);
   Check(Test7, Passed, Failed);
+  Check(Test8, Passed, Failed);
+  Check(Test9, Passed, Failed);
+  Check(Test10, Passed, Failed);
+  Check(Test11, Passed, Failed);
+  Check(Test12, Passed, Failed);
+  Check(Test13, Passed, Failed);
   if Failed > 0 then
     WriteLn(Failed, ' tests FAILED')
   else
